@@ -17,57 +17,54 @@ const privateKey = fs.readFileSync('/etc/letsencrypt/live/quickfire.online/privk
 const certificate = fs.readFileSync('/etc/letsencrypt/live/quickfire.online/fullchain.pem', 'utf8');
 const credentials = { key: privateKey, cert: certificate };
 
-
 const httpsServer = https.createServer(credentials, app);
 
 // Allow express to parse JSON bodies
 app.use(express.json());
 
 httpsServer.listen(3002, host, ()=>{
-console.log(`${host}:3002`)
+  console.log(`${host}:3002`)
 });
 
-const wss = new WebSocketServer({ server:httpsServer });
+const wss = new WebSocketServer({ server: httpsServer });
 
 const players = new Map();
+const gameObjects = new Map();
 
 wss.on('connection', (ws) => {
-  const playerId = generateUniqueId();
-  ws.playerId = playerId;
-
-  // Send the current state of all players to the new client
-  const playerData = Array.from(players.values());
-  ws.send(JSON.stringify({ type: 'players', players: playerData }));
-
   ws.on('message', (message) => {
     const data = JSON.parse(message);
     if (data.type === 'init') {
+      ws.playerId = data.playerId;
       players.set(ws.playerId, { id: ws.playerId, position: data.position });
-      broadcastPlayers();
+      broadcastState();
     } else if (data.type === 'update') {
       players.set(ws.playerId, { id: ws.playerId, position: data.position });
-      broadcastPlayers();
+      broadcastState();
+    } else if (data.type === 'gameObject') {
+      gameObjects.set(data.id, data);
+      broadcastState();
     }
   });
 
   ws.on('close', () => {
     players.delete(ws.playerId);
-    broadcastPlayers();
+    broadcastState();
   });
+
+  // Send the current state of all players and game objects to the new client
+  const playerData = Array.from(players.values());
+  const gameObjectData = Array.from(gameObjects.values());
+  ws.send(JSON.stringify({ type: 'init', players: playerData, gameObjects: gameObjectData }));
 });
 
-const broadcastPlayers = () => {
+const broadcastState = () => {
   const playerData = Array.from(players.values());
+  const gameObjectData = Array.from(gameObjects.values());
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'players', players: playerData }));
+      client.send(JSON.stringify({ type: 'state', players: playerData, gameObjects: gameObjectData }));
     }
-  });
-};
-
-const generateUniqueId = () => {
-  return 'xxxx-xxxx-xxxx-xxxx'.replace(/x/g, () => {
-    return (Math.random() * 16 | 0).toString(16);
   });
 };
 

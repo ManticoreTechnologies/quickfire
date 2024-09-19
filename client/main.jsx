@@ -7,7 +7,7 @@ import App from './src/App'; // Ensure this path is correct
 import "./style.css";
 import rocketLogo from '/rocket.png';
 
-let discord=true;
+let discord=false;
 if(discord){
     // Instantiate the SDK
     const discordSdk = new DiscordSDK(import.meta.env.VITE_DISCORD_CLIENT_ID);

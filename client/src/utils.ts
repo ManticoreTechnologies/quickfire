@@ -15,3 +15,22 @@ export const createCubeCollider = (color: number, position: THREE.Vector3) => {
     cube.position.copy(position);
     return cube;
   };
+
+export const addEdges = (mesh: THREE.Mesh) => {
+      const edges = new THREE.EdgesGeometry(mesh.geometry);
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+      mesh.add(line);
+    };
+    
+export const createWall = (texture: THREE.Texture, position: THREE.Vector3, size: THREE.Vector3) => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(size.x, size.y); // Adjust the repeat values based on the wall size
+    
+      const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+      const material = new THREE.MeshBasicMaterial({ map: texture });
+      const wall = new THREE.Mesh(geometry, material);
+      wall.position.copy(position);
+      addEdges(wall);
+      return wall;
+    };
