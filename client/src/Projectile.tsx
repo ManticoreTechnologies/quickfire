@@ -13,7 +13,7 @@ class Projectile extends GameObject {
   getVelocity(): THREE.Vector3 {
     return this.mesh.userData.velocity.clone();
   }
-
+  
   update(delta: number) {
     this.mesh.position.add(this.getVelocity().clone().multiplyScalar(delta));
   }

@@ -5,6 +5,8 @@ import { WebSocketServer } from "ws";
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
 
 dotenv.config({ path: "../.env" });
 
@@ -21,6 +23,9 @@ const httpsServer = https.createServer(credentials, app);
 
 // Allow express to parse JSON bodies
 app.use(express.json());
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, 'public')));
 
 httpsServer.listen(3002, host, ()=>{
   console.log(`${host}:3002`)
@@ -31,31 +36,62 @@ const wss = new WebSocketServer({ server: httpsServer });
 const players = new Map();
 const gameObjects = new Map();
 
+
+/* On client connect  */
 wss.on('connection', (ws) => {
+
+  /* On message from client */
   ws.on('message', (message) => {
+
+    /* Message from client */
     const data = JSON.parse(message);
+    
+    /* Each client send their player id when they connect */
     if (data.type === 'init') {
-      ws.playerId = data.playerId;
-      players.set(ws.playerId, { id: ws.playerId, position: data.position });
-      broadcastState();
-    } else if (data.type === 'update') {
-      players.set(ws.playerId, { id: ws.playerId, position: data.position });
-      broadcastState();
-    } else if (data.type === 'gameObject') {
-      gameObjects.set(data.id, data);
-      broadcastState();
+      /* Send all clients the new player */
+      wss.clients.forEach(client => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'init_player', player: data }));
+        }
+      });
+  
+      ws.send(JSON.stringify({ type: 'init', players: Array.from(players.values()) }));
+
+
+      ws.playerId = data.playerId; 
+      // store the player id and data
+      players.set(data.playerId, {playerId: data.playerId, position: data.position});
+      console.log(players);
+      /* player joined message */
+      console.log(`Player ${data.playerId} joined`);
+    
+    } else if (data.type === 'update_player') {
+      wss.clients.forEach(client => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'update_player', player: data }));
+        }
+      });
+      players.set(data.playerId, {playerId: data.playerId, position: data.position});
+
+    } 
+  
+    
+  });
+  
+  ws.on('close', () => {
+    if (ws.playerId) {
+      console.log(`Player ${ws.playerId} disconnected`);
+      /*destroy the player object*/
+      players.delete(ws.playerId);
+      wss.clients.forEach(client => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'remove_player', playerId: ws.playerId }));
+        }
+      });
+      ws.playerId = null;
     }
   });
 
-  ws.on('close', () => {
-    players.delete(ws.playerId);
-    broadcastState();
-  });
-
-  // Send the current state of all players and game objects to the new client
-  const playerData = Array.from(players.values());
-  const gameObjectData = Array.from(gameObjects.values());
-  ws.send(JSON.stringify({ type: 'init', players: playerData, gameObjects: gameObjectData }));
 });
 
 const broadcastState = () => {
@@ -63,7 +99,7 @@ const broadcastState = () => {
   const gameObjectData = Array.from(gameObjects.values());
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'state', players: playerData, gameObjects: gameObjectData }));
+      client.send(JSON.stringify({ type: 'players', players: playerData }));
     }
   });
 };

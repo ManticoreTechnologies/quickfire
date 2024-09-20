@@ -5,7 +5,6 @@ import ReactDOM from 'react-dom/client';
 import App from './src/App'; // Ensure this path is correct
 
 import "./style.css";
-import rocketLogo from '/rocket.png';
 
 let discord=false;
 if(discord){
